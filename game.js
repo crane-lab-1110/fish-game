@@ -317,11 +317,21 @@ function startGame(diff, speed = 'normal') {
   initFishes(diff);
 }
 
-function showGameOver() {
+function showGameOver(reason = 'time') {
   if (gameState === 'gameover') return;  // 二重呼び出し防止
   gameState = 'gameover';
-  if (difficulty === 'hard') addToRanking(score);
-  document.getElementById('final-score').textContent = score;
+  if (reason === 'nobonus') {
+    document.getElementById('gameover-emoji').textContent = '🐟';
+    document.getElementById('gameover-title').textContent = 'さかなのなまえを\nみつけてね！';
+    document.getElementById('final-score').textContent = 0;
+    if (difficulty === 'hard') addToRanking(0);
+  } else {
+    document.getElementById('gameover-emoji').textContent = '⏰';
+    document.getElementById('gameover-title').textContent = 'じかんぎれ！';
+    document.getElementById('final-score').textContent = score;
+    if (difficulty === 'hard') addToRanking(score);
+  }
+
   document.getElementById('gameover-screen').classList.remove('hidden');
 }
 
@@ -507,7 +517,7 @@ function catchFish(fish) {
       consecutiveBonusCount++;
       if (consecutiveBonusCount >= MAX_CONSECUTIVE_BONUS) {
         stopTimer();
-        setTimeout(() => showGameOver(), 400);
+        setTimeout(() => showGameOver('nobonus'), 400);
       }
     }
     setTimeout(() => respawnFish(fish), 1300);
