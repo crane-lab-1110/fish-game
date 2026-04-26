@@ -57,9 +57,9 @@ const MILESTONES = {
   100:'100ぴき！！もはやかみ！💥',
 };
 
-const SAVE_KEY        = 'sakana-game-easy-v1';
-const SAVE_KEY_100    = 'sakana-game-easy100-v1';
-const COLLECTION_KEY  = 'sakana-collection-v1';
+const COLLECTION_KEY          = 'sakana-collection-v1';
+const RANKING_KEY             = 'sakana-ranking-v1';
+const MAX_CONSECUTIVE_BONUS   = 10;   // hard: これ以上連続ボーナスでゲームオーバー
 
 const TIMER_INITIAL = 30;
 const TIMER_MAX     = 45;
@@ -69,10 +69,10 @@ let canvas, ctx;
 let canvasW = 0, canvasH = 0;
 
 /* ===== ゲーム状態 ===== */
-let difficulty   = null;
-let speedMode    = 'normal';
-let pendingDiff  = null;
-let gameState    = 'menu';
+let difficulty  = null;
+let speedMode   = 'normal';
+let pendingDiff = null;
+let gameState   = 'menu';
 
 let score         = 0;
 let collectedKana = [];
@@ -83,12 +83,13 @@ let chipCount     = 0;
 let timeLeft      = TIMER_INITIAL;
 let timerInterval = null;
 
-let currentTarget     = null;
-let hintFishIndex     = -1;
-let checkedKanaLength = 0;
+let currentTarget         = null;
+let hintFishIndex         = -1;
+let consecutiveBonusCount = 0;   // hard: 連続ボーナス回数
 
 let activeWordDict = [];
 let collection     = {};
+let ranking        = [];
 
 /* ===== コレクション ===== */
 function loadCollection() {
@@ -106,6 +107,7 @@ function addToCollection(entry) {
   saveCollection();
 }
 
+/* コレクションは常に全100種類で表示（かんたん/むずかしい共通） */
 function showCollectionModal() {
   const statsEl = document.getElementById('col-stats');
   const listEl  = document.getElementById('col-list');
@@ -117,13 +119,7 @@ function showCollectionModal() {
   document.getElementById('col-confirm').classList.add('hidden');
   document.getElementById('col-reset').classList.remove('hidden');
 
-  const dict = activeWordDict.length > 0 ? activeWordDict : [];
-  if (dict.length === 0) {
-    listEl.textContent = 'ゲームをはじめてからみてね！';
-    document.getElementById('col-modal').classList.remove('hidden');
-    return;
-  }
-
+  const dict = WORD_DICT_100;   // 常に全100種類で表示
   const groups = {};
   dict.forEach(e => { (groups[e.bonus] ??= []).push(e); });
 
@@ -159,6 +155,56 @@ function showCollectionModal() {
   });
 
   document.getElementById('col-modal').classList.remove('hidden');
+  requestAnimationFrame(() => { document.getElementById('col-box').scrollTop = 0; });
+}
+
+/* ===== ランキング ===== */
+function loadRanking() {
+  try { ranking = JSON.parse(localStorage.getItem(RANKING_KEY)) || []; }
+  catch(e) { ranking = []; }
+}
+function saveRanking() {
+  try { localStorage.setItem(RANKING_KEY, JSON.stringify(ranking)); } catch(e) {}
+}
+function addToRanking(s) {
+  ranking.push({ score: s, date: Date.now() });
+  ranking.sort((a, b) => b.score - a.score);
+  ranking = ranking.slice(0, 3);
+  saveRanking();
+}
+function formatDate(ts) {
+  const d = new Date(ts);
+  const Y = d.getFullYear();
+  const M = String(d.getMonth() + 1).padStart(2, '0');
+  const D = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${Y}年${M}月${D}日 ${h}時${m}分`;
+}
+function showRankingModal() {
+  const listEl = document.getElementById('ranking-list');
+  listEl.innerHTML = '';
+  document.getElementById('ranking-confirm').classList.add('hidden');
+  document.getElementById('ranking-reset').classList.remove('hidden');
+
+  if (ranking.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'ranking-empty';
+    empty.textContent = 'まだきろくがないよ！';
+    listEl.appendChild(empty);
+  } else {
+    const medals = ['🥇', '🥈', '🥉'];
+    ranking.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'ranking-row';
+      row.innerHTML =
+        `<span class="ranking-medal">${medals[i] ?? (i + 1) + '.'}</span>` +
+        `<span class="ranking-score">${r.score}ひき</span>` +
+        `<span class="ranking-date">${formatDate(r.date)}</span>`;
+      listEl.appendChild(row);
+    });
+  }
+  document.getElementById('ranking-modal').classList.remove('hidden');
 }
 
 /* ===== ターゲットワード管理 ===== */
@@ -184,7 +230,7 @@ function ensureHintFishVisible() {
   const progress = getTargetProgress();
   if (progress >= currentTarget.word.length) return;
 
-  const needed  = currentTarget.word[progress];
+  const needed   = currentTarget.word[progress];
   const uncaught = fishes.filter(f => !f.caught);
   if (!uncaught.length) return;
 
@@ -233,24 +279,6 @@ function updateTimerUI() {
   text.classList.toggle('danger', timeLeft <= 10);
 }
 
-/* ===== localStorage ===== */
-function currentSaveKey() {
-  return difficulty === 'easy100' ? SAVE_KEY_100 : SAVE_KEY;
-}
-function saveState() {
-  if (difficulty !== 'easy' && difficulty !== 'easy100') return;
-  try { localStorage.setItem(currentSaveKey(), JSON.stringify({ score, collectedKana })); } catch(e) {}
-}
-function loadState() {
-  try {
-    const raw = localStorage.getItem(currentSaveKey());
-    if (!raw) return;
-    const s = JSON.parse(raw);
-    score         = typeof s.score === 'number' ? s.score : 0;
-    collectedKana = Array.isArray(s.collectedKana) ? s.collectedKana : [];
-  } catch(e) {}
-}
-
 /* ===== メニューナビゲーション ===== */
 function showStep(n) {
   [1, 2, 3].forEach(i => {
@@ -267,31 +295,15 @@ function startGame(diff, speed = 'normal') {
   showStep(1);
   activeWordDict = (diff === 'easy100' || diff === 'hard') ? WORD_DICT_100 : WORD_DICT;
 
+  /* スコアは毎回0スタート（引き継ぎなし） */
   score = 0; collectedKana = []; chipCount = 0;
-  hintFishIndex = -1; currentTarget = null; lastTime = 0; checkedKanaLength = 0;
+  hintFishIndex = -1; currentTarget = null; lastTime = 0;
+  consecutiveBonusCount = 0;
+
   document.getElementById('kana-list').innerHTML = '';
   document.getElementById('score').textContent   = '0';
   document.getElementById('dino').textContent    = '🦕';
   document.getElementById('dino-text').textContent = 'がんばれー！';
-
-  if (diff === 'easy' || diff === 'easy100') {
-    loadState();
-    document.getElementById('score').textContent = score;
-    collectedKana.forEach(k => renderKanaChip(k));
-    const dinoEl = document.getElementById('dino');
-    if      (score >= 30) dinoEl.textContent = '🐉';
-    else if (score >= 10) dinoEl.textContent = '🦖';
-    if (score > 0) {
-      const t = document.getElementById('dino-text');
-      if      (MILESTONES[score])           t.textContent = MILESTONES[score];
-      else if (score <= DINO_STORY.length)  t.textContent = DINO_STORY[score - 1];
-      else                                  t.textContent = DINO_POOL[Math.floor(Math.random() * DINO_POOL.length)];
-    }
-    requestAnimationFrame(() => {
-      const list = document.getElementById('kana-list');
-      list.scrollLeft = list.scrollWidth;
-    });
-  }
 
   stopTimer();
   const timerBar = document.getElementById('timer-bar');
@@ -306,20 +318,26 @@ function startGame(diff, speed = 'normal') {
 }
 
 function showGameOver() {
+  if (gameState === 'gameover') return;  // 二重呼び出し防止
   gameState = 'gameover';
+  if (difficulty === 'hard') addToRanking(score);
   document.getElementById('final-score').textContent = score;
   document.getElementById('gameover-screen').classList.remove('hidden');
 }
+
 function retryGame() {
   document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('ranking-modal').classList.add('hidden');
   startGame('hard', 'normal');
 }
+
 function goToMenu() {
   stopTimer();
   gameState = 'menu';
   fishes = [];
   if (ctx) ctx.clearRect(0, 0, canvasW, canvasH);
   document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('ranking-modal').classList.add('hidden');
   document.getElementById('confirm-modal').classList.add('hidden');
   showStep(1);
   document.getElementById('menu-screen').classList.remove('hidden');
@@ -364,13 +382,20 @@ function drawFishLayer() {
     ctx.restore();
 
     /* かな文字 */
-    const ks     = Math.max(14, Math.round(fs * 0.50));
-    const kanaY  = fs * 0.55 + 2;
+    const ks    = Math.max(14, Math.round(fs * 0.50));
+    const kanaY = fs * 0.55 + 2;
     const isHint = fish.isHint;
 
     ctx.font = `900 ${ks}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
+
+    const kW = ctx.measureText(fish.kana).width + 12;
+    const kH = ks + 8;
+    ctx.fillStyle = isHint ? 'rgba(80,60,0,0.55)' : 'rgba(0,0,0,0.40)';
+    ctx.beginPath();
+    ctx.roundRect(-kW / 2, kanaY - 2, kW, kH, kH / 2);
+    ctx.fill();
 
     if (isHint) {
       const glow = (Math.sin(t / 280) * 0.5 + 0.5) * 8 + 2;
@@ -378,12 +403,7 @@ function drawFishLayer() {
       ctx.shadowBlur  = glow;
     }
 
-    ctx.strokeStyle = 'rgba(0,0,0,0.78)';
-    ctx.lineWidth   = Math.max(3, ks * 0.18);
-    ctx.lineJoin    = 'round';
-    ctx.strokeText(fish.kana, 0, kanaY);
-
-    ctx.fillStyle  = isHint ? '#ffd700' : '#fff';
+    ctx.fillStyle = isHint ? '#ffd700' : '#fff';
     ctx.fillText(fish.kana, 0, kanaY);
 
     ctx.shadowBlur = 0;
@@ -398,9 +418,11 @@ function hitTestFish(tapX, tapY) {
   if (gameState !== 'playing') return;
   for (const fish of fishes) {
     if (fish.caught) continue;
-    const dx = tapX - fish.screenX;
-    const dy = tapY - fish.screenY;
-    if (dx * dx + dy * dy < fish.fontSize * fish.fontSize * 0.81) {
+    const dx = Math.abs(tapX - fish.screenX);
+    const dy = Math.abs(tapY - fish.screenY);
+    const halfW = fish.fontSize * 0.52;
+    const halfH = fish.fontSize * 0.50;
+    if (dx < halfW && dy < halfH) {
       catchFish(fish);
       return;
     }
@@ -411,17 +433,19 @@ function hitTestFish(tapX, tapY) {
 function initFishes(diff) {
   fishes = [];
   const defs   = diff === 'hard' ? FISH_DEFS_HARD : FISH_DEFS_EASY;
-  const factor = diff === 'hard' ? 1.0
-               : speedMode === 'slow' ? 0.5
-               : speedMode === 'fast' ? 2.0
+  const factor = diff === 'hard'          ? 1.0
+               : speedMode === 'slow'     ? 0.5
+               : speedMode === 'fast'     ? 2.0
                : 1.0;
 
   defs.forEach((def, i) => {
+    const baseY = 10 + (i / defs.length) * 70;
     fishes.push({
       emoji:    def.emoji,
       fontSize: def.fontSize,
       x:        Math.random() * 75,
-      y:        8 + (i / defs.length) * 68,
+      y:        baseY,
+      baseY,
       speed:    def.speed * factor,
       dir:      Math.random() > 0.5 ? 1 : -1,
       caught:   false,
@@ -461,27 +485,44 @@ function catchFish(fish) {
   score++;
 
   collectedKana.push(caughtKana);
-  checkedKanaLength = 0;
   renderKanaChip(caughtKana);
   ensureHintFishVisible();
   updateHintStyling();
   updateScore();
   showCatchPopup(caughtKana);
   cheerDino();
-  saveState();
 
-  setTimeout(() => checkWordBonus(), 1550);
+  /* ボーナス判定を即時（同期）実行 — 別のタップで配列がずれる前に確定 */
+  const bonusEntry = findWordBonus();
 
-  setTimeout(() => {
-    fish.x      = Math.random() * 75;
-    fish.y      = 8 + Math.random() * 68;
-    fish.dir    = Math.random() > 0.5 ? 1 : -1;
-    fish.kana   = randomKana();
-    fish.isHint = false;
-    fish.caught = false;
-    ensureHintFishVisible();
-    updateHintStyling();
-  }, 1300);
+  if (bonusEntry) {
+    /* ボーナスあり: 連続ノーボーナスカウントをリセット */
+    if (difficulty === 'hard') consecutiveBonusCount = 0;
+    /* ポップアップ表示タイミング(1550ms)に合わせて魚かな変更 */
+    setTimeout(() => triggerWordBonus(bonusEntry, bonusEntry.word.length), 1550);
+    setTimeout(() => respawnFish(fish), 1600);   // ポップアップ出現直後に入れ替え
+  } else {
+    /* ボーナスなし: hard はカウント増加 → 10回連続でゲームオーバー */
+    if (difficulty === 'hard') {
+      consecutiveBonusCount++;
+      if (consecutiveBonusCount >= MAX_CONSECUTIVE_BONUS) {
+        stopTimer();
+        setTimeout(() => showGameOver(), 400);
+      }
+    }
+    setTimeout(() => respawnFish(fish), 1300);
+  }
+}
+
+function respawnFish(fish) {
+  fish.x      = Math.random() * 75;
+  fish.y      = fish.baseY;
+  fish.dir    = Math.random() > 0.5 ? 1 : -1;
+  fish.kana   = randomKana();
+  fish.isHint = false;
+  fish.caught = false;
+  ensureHintFishVisible();
+  updateHintStyling();
 }
 
 /* ===== ひらがなチップ ===== */
@@ -496,29 +537,28 @@ function renderKanaChip(kana) {
 }
 
 /* ===== ワードボーナス ===== */
-function checkWordBonus() {
-  if (collectedKana.length === checkedKanaLength) return;
-  checkedKanaLength = collectedKana.length;
+/* catchFish から同期で呼ばれる — kana が push された直後に判定するため取りこぼしゼロ */
+function findWordBonus() {
   for (const entry of activeWordDict) {
     const len = entry.word.length;
     if (collectedKana.length >= len &&
         collectedKana.slice(-len).join('') === entry.word) {
-      triggerWordBonus(entry, len);
-      return;
+      return entry;
     }
   }
+  return null;
 }
 
 function triggerWordBonus(entry, len) {
   score += entry.bonus;
   updateScore();
-  saveState();
   addToCollection(entry);
   pickNewTarget();
 
   if (difficulty === 'hard') {
     timeLeft = Math.min(timeLeft + entry.word.length * 2, TIMER_MAX);
     updateTimerUI();
+    // ボーナス発生時は consecutiveBonusCount を catchFish 側でリセット済み
   }
 
   const popup = document.getElementById('popup');
@@ -595,9 +635,9 @@ function showHintModal() {
       const span = document.createElement('span');
       span.className = 'hint-char';
       span.textContent = ch;
-      if      (i < progress)  span.classList.add('done');
+      if      (i < progress)   span.classList.add('done');
       else if (i === progress) span.classList.add('next');
-      else                    span.classList.add('todo');
+      else                     span.classList.add('todo');
       charsEl.appendChild(span);
     });
   }
@@ -626,6 +666,8 @@ function showHintModal() {
   });
 
   document.getElementById('hint-modal').classList.remove('hidden');
+  /* 毎回一番上から表示 */
+  requestAnimationFrame(() => { document.getElementById('hint-box').scrollTop = 0; });
 }
 
 /* ===== ユーティリティ ===== */
@@ -664,6 +706,7 @@ window.addEventListener('load', () => {
   });
 
   loadCollection();
+  loadRanking();
   requestAnimationFrame(loop);
 
   /* メニューナビゲーション */
@@ -695,6 +738,8 @@ window.addEventListener('load', () => {
   document.getElementById('col-reset').addEventListener('click', () => {
     document.getElementById('col-confirm').classList.remove('hidden');
     document.getElementById('col-reset').classList.add('hidden');
+    /* リセットボタン真上の確認ダイアログをスクロールして見せる */
+    document.getElementById('col-confirm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
   document.getElementById('col-reset-yes').addEventListener('click', () => {
     collection = {};
@@ -709,14 +754,33 @@ window.addEventListener('load', () => {
   /* メニューへ戻る */
   document.getElementById('reset-btn').addEventListener('click', () =>
     document.getElementById('confirm-modal').classList.remove('hidden'));
-  document.getElementById('confirm-yes').addEventListener('click', () => {
-    if (difficulty === 'easy')    localStorage.removeItem(SAVE_KEY);
-    if (difficulty === 'easy100') localStorage.removeItem(SAVE_KEY_100);
-    goToMenu();
-  });
+  document.getElementById('confirm-yes').addEventListener('click', goToMenu);
   document.getElementById('confirm-no').addEventListener('click', () =>
     document.getElementById('confirm-modal').classList.add('hidden'));
 
+  /* ゲームオーバー */
   document.getElementById('gameover-retry').addEventListener('click', retryGame);
+  document.getElementById('gameover-ranking').addEventListener('click', showRankingModal);
   document.getElementById('gameover-menu').addEventListener('click', goToMenu);
+
+  /* ランキング */
+  document.getElementById('ranking-close').addEventListener('click', () =>
+    document.getElementById('ranking-modal').classList.add('hidden'));
+  document.getElementById('ranking-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) document.getElementById('ranking-modal').classList.add('hidden');
+  });
+  document.getElementById('ranking-reset').addEventListener('click', () => {
+    document.getElementById('ranking-confirm').classList.remove('hidden');
+    document.getElementById('ranking-reset').classList.add('hidden');
+    document.getElementById('ranking-confirm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  document.getElementById('ranking-reset-yes').addEventListener('click', () => {
+    ranking = [];
+    saveRanking();
+    showRankingModal();
+  });
+  document.getElementById('ranking-reset-no').addEventListener('click', () => {
+    document.getElementById('ranking-confirm').classList.add('hidden');
+    document.getElementById('ranking-reset').classList.remove('hidden');
+  });
 });

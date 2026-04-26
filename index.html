@@ -124,6 +124,7 @@
       </div>
       <div class="gameover-buttons">
         <button id="gameover-retry">もういちど！</button>
+        <button id="gameover-ranking">🏆 ランキング</button>
         <button id="gameover-menu">メニューへ</button>
       </div>
     </div>
@@ -151,16 +152,35 @@
       <div class="col-title">🏆 コレクション</div>
       <div id="col-stats"></div>
       <div id="col-list"></div>
-      <div class="col-footer">
-        <button id="col-reset" class="col-reset-btn">🗑️ リセット</button>
-        <button id="col-close" class="col-close-btn">とじる ✕</button>
-      </div>
       <div id="col-confirm" class="hidden">
         <p>コレクションをリセットしますか？</p>
         <div class="col-confirm-btns">
           <button id="col-reset-yes">はい</button>
           <button id="col-reset-no">やめる</button>
         </div>
+      </div>
+      <div class="col-footer">
+        <button id="col-reset" class="col-reset-btn">🗑️ リセット</button>
+        <button id="col-close" class="col-close-btn">とじる ✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ランキングモーダル -->
+  <div id="ranking-modal" class="hidden">
+    <div id="ranking-box">
+      <div class="ranking-title">🏆 ベスト３</div>
+      <div id="ranking-list"></div>
+      <div id="ranking-confirm" class="hidden">
+        <p>ランキングをリセットしますか？</p>
+        <div class="ranking-confirm-btns">
+          <button id="ranking-reset-yes">はい</button>
+          <button id="ranking-reset-no">やめる</button>
+        </div>
+      </div>
+      <div class="ranking-footer">
+        <button id="ranking-reset" class="ranking-reset-btn">🗑️ リセット</button>
+        <button id="ranking-close" class="ranking-close-btn">とじる ✕</button>
       </div>
     </div>
   </div>
