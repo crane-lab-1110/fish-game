@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>さかなつりゲーム 🎣</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ★ メニュー画面 ★ -->
+  <div id="menu-screen">
+    <div id="menu-box">
+      <div id="menu-logo">🎣</div>
+      <h1 id="menu-title">さかなつり<br>ゲーム</h1>
+      <div id="menu-dino">🦕</div>
+
+      <!-- ステップ１：むずかしさえらび -->
+      <div id="menu-step1">
+        <p class="menu-sub">むずかしさをえらんでね！</p>
+        <button id="btn-easy" class="diff-btn">
+          <span class="diff-name">🌈 かんたん</span>
+          <span class="diff-desc">ゆっくりあそぼう</span>
+        </button>
+        <button id="btn-hard" class="diff-btn hard">
+          <span class="diff-name">⏱️ むずかしい</span>
+          <span class="diff-desc">はやい・タイマーあり</span>
+        </button>
+      </div>
+
+      <!-- ステップ２：ことばえらび（かんたんのみ） -->
+      <div id="menu-step2" class="hidden">
+        <p class="menu-sub">なにをおぼえる？</p>
+        <button id="btn-30" class="diff-btn">
+          <span class="diff-name">🐟 30ことば</span>
+          <span class="diff-desc">よくしられたさかな</span>
+        </button>
+        <button id="btn-100" class="diff-btn easy100">
+          <span class="diff-name">🐠 100ことば</span>
+          <span class="diff-desc">いろんなさかな！</span>
+        </button>
+        <button id="btn-back1" class="back-btn">← もどる</button>
+      </div>
+
+      <!-- ステップ３：はやさえらび（かんたんのみ） -->
+      <div id="menu-step3" class="hidden">
+        <p class="menu-sub">はやさをえらんでね！</p>
+        <button id="btn-slow" class="diff-btn slow">
+          <span class="diff-name">🐢 おそい</span>
+          <span class="diff-desc">ゆっくりおよぐよ</span>
+        </button>
+        <button id="btn-normal" class="diff-btn normal">
+          <span class="diff-name">🐟 ふつう</span>
+          <span class="diff-desc">ちょうどいいはやさ</span>
+        </button>
+        <button id="btn-fast" class="diff-btn fast">
+          <span class="diff-name">🦈 はやい</span>
+          <span class="diff-desc">むずかしいとおなじ！</span>
+        </button>
+        <button id="btn-back2" class="back-btn">← もどる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ゲーム本体 -->
+  <div id="game">
+
+    <header id="score-bar">
+      <span class="score-text">🎣 つれたさかな：<span id="score">0</span>ひき！</span>
+      <button id="reset-btn">🔄 メニュー</button>
+    </header>
+
+    <!-- タイマーバー（むずかしいモードのみ表示） -->
+    <div id="timer-bar" class="hidden">
+      <span id="timer-label">⏱️</span>
+      <div id="timer-track">
+        <div id="timer-fill"></div>
+      </div>
+      <span id="timer-text">30びょう</span>
+    </div>
+
+    <div id="kana-bar">
+      <span class="kana-label">あつめたもじ：</span>
+      <div id="kana-list"></div>
+      <button id="col-btn" title="コレクション">🏆</button>
+      <button id="hint-btn">ことば？💡</button>
+    </div>
+
+    <section id="sky">
+      <div id="sun">☀️</div>
+      <div id="cloud-a">☁️</div>
+      <div id="cloud-b">☁️</div>
+    </section>
+
+    <section id="ocean">
+      <canvas id="fish-canvas"></canvas>
+      <div id="seabed">
+        <span>🪨</span><span>🌿</span><span>🪨</span>
+        <span>🌿</span><span>🪨</span><span>🌿</span>
+      </div>
+    </section>
+
+    <footer id="shore">
+      <div id="dino-scene">
+        <div id="speech-bubble">
+          <p id="dino-text">がんばれー！</p>
+        </div>
+        <div id="dino">🦕</div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- キャッチ＆ボーナスポップアップ -->
+  <div id="popup" aria-live="assertive"></div>
+
+  <!-- ★ ゲームオーバー画面（むずかしいモード） ★ -->
+  <div id="gameover-screen" class="hidden">
+    <div id="gameover-box">
+      <div id="gameover-emoji">⏰</div>
+      <div id="gameover-title">じかんぎれ！</div>
+      <div id="gameover-result">
+        つれたさかな：<span id="final-score">0</span>ひき！
+      </div>
+      <div class="gameover-buttons">
+        <button id="gameover-retry">もういちど！</button>
+        <button id="gameover-menu">メニューへ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ヒントモーダル -->
+  <div id="hint-modal" class="hidden">
+    <div id="hint-box">
+      <div id="hint-title">💡 ことばのヒント</div>
+      <div id="hint-target-section">
+        <div id="hint-target-label"></div>
+        <div id="hint-target-chars"></div>
+      </div>
+      <div id="hint-words-section">
+        <div class="hint-section-title">つくれることば いちらん：</div>
+        <div id="hint-word-list"></div>
+      </div>
+      <button id="hint-close">とじる ✕</button>
+    </div>
+  </div>
+
+  <!-- コレクションモーダル -->
+  <div id="col-modal" class="hidden">
+    <div id="col-box">
+      <div class="col-title">🏆 コレクション</div>
+      <div id="col-stats"></div>
+      <div id="col-list"></div>
+      <div class="col-footer">
+        <button id="col-reset" class="col-reset-btn">🗑️ リセット</button>
+        <button id="col-close" class="col-close-btn">とじる ✕</button>
+      </div>
+      <div id="col-confirm" class="hidden">
+        <p>コレクションをリセットしますか？</p>
+        <div class="col-confirm-btns">
+          <button id="col-reset-yes">はい</button>
+          <button id="col-reset-no">やめる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- メニューへもどる確認 -->
+  <div id="confirm-modal" class="hidden">
+    <div id="confirm-box">
+      <p>メニューへもどりますか？</p>
+      <div class="confirm-buttons">
+        <button id="confirm-yes">はい</button>
+        <button id="confirm-no">やめる</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="words.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
